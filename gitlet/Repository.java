@@ -56,10 +56,6 @@ public class Repository {
      */
     HashMap<String, Commit> commits;
     /**
-     * points to the most recent commit.
-     */
-    String master;
-    /**
      * points to the current commit.
      */
     String head;
@@ -116,40 +112,19 @@ public class Repository {
         }
 
         // retrieve the blobs files into the blobs map
-        List<String> blobFiles = Utils.plainFilenamesIn(BLOBS_DIR); // get all the commit file names from the BLOBS_DIR
-        for (String blobFileName : blobFiles) {
+        List<String> blobFileNames = Utils.plainFilenamesIn(BLOBS_DIR); // get all the commit file names from the BLOBS_DIR
+        for (String blobFileName : blobFileNames) {
 
             // get the blob object from the commit file.
             File blobFile = new File(BLOBS_DIR, blobFileName);
             Blob blob = readObject(blobFile, Blob.class);
-
-            blobs.put(blobFileName, blob);
+            String blobId = blob.getId();
+            blobs.put(blobId, blob);
         }
-
-        // get all the branch files from the BRANCHES_DIR
-        List<String> branchNames = Utils.plainFilenamesIn(BRANCHES_DIR); // get all the branch file names from the BRANCHES_DIR
-        for (String branchName : branchNames) {
-
-            // get the branch object from the commit file.
-            File branchFile = new File(BRANCHES_DIR, branchName);
-
-            Branch branch = readObject(branchFile, Branch.class);
-
-            branches.put(branchName, branch.getId());
-
-            String branchId = readContentsAsString(branchFile);
-
-            branches.put(branchName, branchId);
-
-        }
-
-        master = readContentsAsString(MASTER);
+        
         head = readContentsAsString(HEAD);
         curBranch = readContentsAsString(CURRENT_BRANCH);
-
-        stagingArea = readObject(index, StagingArea.class);
-
-        if (index.exists())
+        if (index.exists())// ensure that index file exists cuz it can not be existent if there aren`t files staged before. 
             stagingArea = readObject(index, StagingArea.class);
 
 
@@ -165,11 +140,9 @@ public class Repository {
         GITLET_DIR.mkdirs();
         COMMITS_DIR.mkdirs();
         BLOBS_DIR.mkdirs();
+        BRANCHES_DIR.mkdirs();
 
-        stagingArea = new StagingArea();
-        commits = new HashMap<String, Commit>();
-        branches = new HashMap<String, String>();
-        blobs = new HashMap<String, Blob>();
+        mapInitializations();
 
         // create initial commit has no parent and no files
         Commit initialCommit = new Commit("initial commit", null);
@@ -183,19 +156,18 @@ public class Repository {
 
         // save the head state in HEAD file.
         head = initialCommitId;
-        writeObject(HEAD, initialCommitId);
+        writeContents(HEAD, head);
 
-        // By default the current branch is the master.
+        // save the master branch in a file in BRANCHES_DIR.
+        File masterBranchFile = new File(BRANCHES_DIR, "master");
+        writeContents(masterBranchFile, initialCommitId); // master file content is the most recent commit in the master branch which is the initial commit id
+
+        // by default the first branch and is current branch is the master branch.
         curBranch = "master";
-        master = initialCommitId;
-        writeContents(MASTER, master);// update the master file.
+        writeContents(CURRENT_BRANCH ,  curBranch);// Save the current branch which is master in the CURRENT_BRANCH file.
 
-        branches.put(curBranch, master);// Add the current branch in the branches map.
 
-        //save the curBranch in a file in BRANCHES_DIR.
-        File curBranchFile = new File(BRANCHES_DIR, curBranch);// access the branch file by the branch name.
-        writeContents(curBranchFile, master);// the branch file content is the commit id which the branch references it.
-        writeContents(CURRENT_BRANCH, "master");//save the current branch in the CURRENT_BRANCH file.
+        branches.put("master", initialCommitId);// Add the branch "master" in the branches map to accessed by its latest commit id wcich is the initial commit id.
     }
 
     public void add(String fileName) {
@@ -216,8 +188,8 @@ public class Repository {
         // find SHA1 id for the addedFile
         String fileId = Utils.sha1(fileContent);
 
-        // check if the addedFile version/content is already existent in the last commit blobs of the current branch(master)
-        boolean existsInLastCommit = commits.get(master).containsFile(fileName);
+        // check if the file is tracked in the head commit (current commit).
+        boolean existsInLastCommit = commits.get(head).containsFile(fileName);
 
         // add the file if it is not existent in the last commit so it needs to be added.
         if (!existsInLastCommit) {
@@ -227,7 +199,7 @@ public class Repository {
 
             if (!blobExsits) {
                 // create new blob for the new version of the addedFile
-                Blob blob = new Blob(addedFileForAddition, fileName);
+                Blob blob = new Blob(addedFileForAddition);
 
                 // Create a new file for the new blob in BLOBS_DIR
                 File blobFile = new File(BLOBS_DIR, blob.getId());
@@ -402,7 +374,7 @@ public class Repository {
         if (curCommit.containsFile(fileName)) {
 
             // get the file from the curCommit.
-            String fileId = curCommit.getFile(fileName);
+            String fileId = curCommit.getFileId(fileName);
 
             String fileContent = blobs.get(fileId).getContent();// get the file content from it's blob.
 
@@ -425,7 +397,7 @@ public class Repository {
             if (commit.containsFile(fileName)) {
 
 
-                String fileId = commit.getFile(fileName); // get the file from the curCommit.
+                String fileId = commit.getFileId(fileName); // get the file from the curCommit.
 
                 String fileContent = blobs.get(fileId).getContent();// get the file content from it's blob.
 
@@ -473,7 +445,7 @@ public class Repository {
             if (branchHead.containsFile(fileName)) { // check if file exists in the branch head commit to be updated to the branchHead version.
 
                 // find the id of the fileInBranchHead
-                String fileIdInBranchHead = branchHead.getFile(fileName);
+                String fileIdInBranchHead = branchHead.getFileId(fileName);
 
                 // find the id of the same file in CWD.
                 String fileIdInCWD = Utils.sha1(fileInCWD);
@@ -500,7 +472,7 @@ public class Repository {
             // add the newFile if its not existent in CWD.
             if (!cwdFilesMap.containsKey(fileName)) {
                 File newFile = new File(CWD, fileName);
-                String newFileContent = blobs.get(branchHead.getFile(fileName)).getContent();
+                String newFileContent = blobs.get(branchHead.getFileId(fileName)).getContent();
                 writeContents(newFile, newFileContent);
             }
         }
@@ -524,14 +496,10 @@ public class Repository {
             System.out.println("A branch with that name already exists.");
             return;
         }
-
-        Branch newBranch = new Branch(branchName, head); // Create the new branch at the current commit.
-
-        // Save the new branch in a file on desk.
-        File newBranchFile = new File(BRANCHES_DIR, branchName);
-        writeObject(newBranchFile, newBranch);
-
-        branches.put(branchName, newBranch.getId()); // Track the new branch in the branch map.
+        
+        // save the new branch in BRANCHES_DIR. 
+        File branchFile = new File(BRANCHES_DIR, branchName);
+        writeContents(branchFile, head);
     }
 
     public void rm_branch(String branchName) {
