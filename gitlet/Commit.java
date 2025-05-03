@@ -57,10 +57,8 @@ public class Commit implements Serializable {
         return message;
     }
 
-<<<<<<< HEAD
-    public String getId(){
-        return Utils.sha1(this);
-=======
+
+
     public String getId() {
         return Utils.sha1(
                 message,
@@ -72,7 +70,7 @@ public class Commit implements Serializable {
 
     public String getFileId(String fileName) {
         return files.get(fileName);
->>>>>>> master
+
     }
 
     public String getParent() {
