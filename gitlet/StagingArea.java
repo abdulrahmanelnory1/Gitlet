@@ -21,13 +21,23 @@ public class StagingArea implements Serializable {
         return this.addedFiles;
     }
 
+<<<<<<< HEAD
+=======
+    public HashMap<String, String> getRemovedFiles() {
+        return this.removedFiles;
+    }
+>>>>>>> master
     public boolean containsAddedFile(String fileId) {
         return addedFiles.containsKey(fileId);
     }
 
+<<<<<<< HEAD
     public HashMap<String, String> getRemovedFiles() {
         return this.removedFiles;
     }
+=======
+
+>>>>>>> master
 
     public void addForAddition(String fileName, String file) {
         addedFiles.put(fileName, file);
@@ -37,7 +47,11 @@ public class StagingArea implements Serializable {
         removedFiles.put(fileName, file);
     }
 
+<<<<<<< HEAD
     public boolean existentForEdition(String fileName) {
+=======
+    public boolean existentForAddition(String fileName) {
+>>>>>>> master
         return addedFiles.containsKey(fileName);
     }
 
@@ -49,6 +63,10 @@ public class StagingArea implements Serializable {
         addedFiles.remove(fileName);
     }
 
+<<<<<<< HEAD
+=======
+    /** save the the current staging area object in the File file which is always index file*/
+>>>>>>> master
     public void save(File file) {
         writeObject(file, this);
     }

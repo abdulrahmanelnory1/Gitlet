@@ -57,8 +57,22 @@ public class Commit implements Serializable {
         return message;
     }
 
+<<<<<<< HEAD
     public String getId(){
         return Utils.sha1(this);
+=======
+    public String getId() {
+        return Utils.sha1(
+                message,
+                timestamp.toString(),
+                Utils.serialize(files),
+                parent != null ? parent : "null"  // Assuming parent is already the ID string
+        );
+    }
+
+    public String getFileId(String fileName) {
+        return files.get(fileName);
+>>>>>>> master
     }
 
     public String getParent() {
