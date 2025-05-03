@@ -64,10 +64,6 @@ public class Repository {
      */
     StagingArea stagingArea;
     /**
-     * Data structure(map) represents all branches with the branch name as a key and branch id(latest commit in the branch) as value.
-     */
-    HashMap<String, String> branches;
-    /**
      * Represents the current branch.
      */
     String curBranch;
@@ -80,7 +76,6 @@ public class Repository {
     public void mapInitializations() {
         stagingArea = new StagingArea();
         commits = new HashMap<String, Commit>();
-        branches = new HashMap<String, String>();
         blobs = new HashMap<String, Blob>();
     }
 
@@ -121,10 +116,10 @@ public class Repository {
             String blobId = blob.getId();
             blobs.put(blobId, blob);
         }
-        
+
         head = readContentsAsString(HEAD);
         curBranch = readContentsAsString(CURRENT_BRANCH);
-        if (index.exists())// ensure that index file exists cuz it can not be existent if there aren`t files staged before. 
+        if (index.exists())// ensure that index file exists cuz it can not be existent if there aren`t files staged before.
             stagingArea = readObject(index, StagingArea.class);
 
 
@@ -165,9 +160,6 @@ public class Repository {
         // by default the first branch and is current branch is the master branch.
         curBranch = "master";
         writeContents(CURRENT_BRANCH ,  curBranch);// Save the current branch which is master in the CURRENT_BRANCH file.
-
-
-        branches.put("master", initialCommitId);// Add the branch "master" in the branches map to accessed by its latest commit id wcich is the initial commit id.
     }
 
     public void add(String fileName) {
@@ -261,17 +253,17 @@ public class Repository {
         File newCommitFile = new File(COMMITS_DIR, newCommitId);
         writeObject(newCommitFile, newCommit);
 
-        // Update branch pointer
-        branches.put(curBranch, newCommitId);
-        writeContents(CURRENT_BRANCH, curBranch);
-
-        // Clear and save staging area
-        stagingArea.clear();
-        stagingArea.save(index);
+        // update the most recent commit in the curBranch to the new commit.
+        File curBranchFile = new File(BRANCHES_DIR, curBranch);
+        writeContents(curBranchFile, newCommitId);
 
         // Update HEAD
         head = newCommitId;
         writeContents(HEAD, head);
+
+        // Clear and save staging area
+        stagingArea.clear();
+        stagingArea.save(index);
     }
 
 
@@ -415,21 +407,22 @@ public class Repository {
         validateInitialized();
 
         // Check if the branch already exists
-        if (!branches.containsKey(branchName)) {
+        File BranchFile  = new File(BRANCHES_DIR, branchName);
+        if (!BranchFile.exists()) {
             System.out.println("No such branch exists.");
             return;
         }
-        // get the branch.
-        String branchHeadId = branches.get(branchName);
+        // get the branch (the most recent commit in that branch)
+        String branchId = readContentsAsString(BranchFile);
 
         // if i am already in the branch branchName => then i go nowhere .
-        if (head.equals(branchHeadId)) {
+        if (head.equals(branchId)) {
             System.out.println("No need to checkout the current branch.");
             return;
         }
 
         // Retrieve all files in the commit at the head of the given branch.
-        Commit branchHead = commits.get(branchHeadId);
+        Commit branchHead = commits.get(branchId);
 
         // iterate all the files in CWD and if there is a file exists in the branchHead => update it in the CWD, if not => remove it.
         List<String> cwdFiles = Utils.plainFilenamesIn(CWD); // retrieve all the files from the cwd.
@@ -492,21 +485,22 @@ public class Repository {
         validateInitialized();
 
         // Check if the branch already exists
-        if (branches.containsKey(branchName)) {
+        File branchFile  = new File(BRANCHES_DIR, branchName);
+        if (branchFile.exists()) {
             System.out.println("A branch with that name already exists.");
             return;
         }
-        
-        // save the new branch in BRANCHES_DIR. 
-        File branchFile = new File(BRANCHES_DIR, branchName);
+
+        // save the new branch in BRANCHES_DIR.
         writeContents(branchFile, head);
     }
 
     public void rm_branch(String branchName) {
 
         validateInitialized();
-
-        if (!branches.containsKey(branchName)) {
+        
+        File branchFile  = new File(BRANCHES_DIR, branchName);
+        if (!branchFile.exists()) {
             System.out.println("A branch with that name does not exist.");
             return;
         }
@@ -517,11 +511,8 @@ public class Repository {
         }
 
         // delete the branch file from the BRANCHES_DIR.
-        File branchFile = new File(BRANCHES_DIR, branchName);
         Utils.restrictedDelete(branchFile);
-
-        // delete the file from branches map.
-        branches.remove(branchName);
+        
 
     }
 
