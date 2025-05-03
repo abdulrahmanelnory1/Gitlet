@@ -79,21 +79,18 @@ public class Repository {
      * Tracks whether the Gitlet repository has been initialized.
      */
 
-    public boolean backupPerformed  = false; // to backup GITLET_DIR state each time when the program terminates
+    public boolean backupPerformed = false; // to backup GITLET_DIR state each time when the program terminates
 
-<<<<<<< HEAD
-=======
-    public void mapInitializations(){
+    public void mapInitializations() {
         stagingArea = new StagingArea();
         commits = new HashMap<String, Commit>();
         branches = new HashMap<String, String>();
         blobs = new HashMap<String, Blob>();
     }
 
->>>>>>> master
-    public void validateInitialized(){
+    public void validateInitialized() {
 
-        if(!GITLET_DIR.exists()){
+        if (!GITLET_DIR.exists()) {
             System.out.println("GITLET_DIR does not exist");
             System.exit(0);
         }
@@ -104,17 +101,12 @@ public class Repository {
         if (!GITLET_DIR.exists() || backupPerformed)
             return;
 
-<<<<<<< HEAD
-        // retrieve the commit files into the commits map
-        List<String> commitFiles = Utils.plainFilenamesIn(COMMITS_DIR); // get all the commit file names from the COMMITS_DIR
-        for (String commitFileName : commitFiles) {
-=======
         mapInitializations();
 
         // retrieve the commit files into the commits map
         List<String> commitFileNames = Utils.plainFilenamesIn(COMMITS_DIR); // get all the commit file names from the COMMITS_DIR
         for (String commitFileName : commitFileNames) {
->>>>>>> master
+
 
             // get the commit object from the commit file.
             File commitFile = new File(COMMITS_DIR, commitFileName);
@@ -127,7 +119,7 @@ public class Repository {
         List<String> blobFiles = Utils.plainFilenamesIn(BLOBS_DIR); // get all the commit file names from the BLOBS_DIR
         for (String blobFileName : blobFiles) {
 
-            // get the commit object from the commit file.
+            // get the blob object from the commit file.
             File blobFile = new File(BLOBS_DIR, blobFileName);
             Blob blob = readObject(blobFile, Blob.class);
 
@@ -140,27 +132,27 @@ public class Repository {
 
             // get the branch object from the commit file.
             File branchFile = new File(BRANCHES_DIR, branchName);
-<<<<<<< HEAD
+
             Branch branch = readObject(branchFile, Branch.class);
 
             branches.put(branchName, branch.getId());
-=======
+
             String branchId = readContentsAsString(branchFile);
 
             branches.put(branchName, branchId);
->>>>>>> master
+
         }
 
         master = readContentsAsString(MASTER);
         head = readContentsAsString(HEAD);
         curBranch = readContentsAsString(CURRENT_BRANCH);
-<<<<<<< HEAD
-        stagingArea = readObject(index, StagingArea.class);
-=======
-        if(index.exists())
-           stagingArea = readObject(index, StagingArea.class);
 
->>>>>>> master
+        stagingArea = readObject(index, StagingArea.class);
+
+        if (index.exists())
+            stagingArea = readObject(index, StagingArea.class);
+
+
     }
 
     public void init() {
@@ -173,7 +165,6 @@ public class Repository {
         GITLET_DIR.mkdirs();
         COMMITS_DIR.mkdirs();
         BLOBS_DIR.mkdirs();
-<<<<<<< HEAD
 
         stagingArea = new StagingArea();
         commits = new HashMap<String, Commit>();
@@ -183,61 +174,28 @@ public class Repository {
         // create initial commit has no parent and no files
         Commit initialCommit = new Commit("initial commit", null);
         // save the initialCommit object in the file named by its SHA1 id
-        File commitFile = new File(COMMITS_DIR, "initialCommitId");
-        writeObject(commitFile, initialCommit);
-
-        // Add the initial commit in the commits map with its id as a key.
-        String initialCommitId = initialCommit.getId();
-        commits.put(initialCommitId, initialCommit);// add the initial commit in the commits map
-
-        // By default the current branch is master.
-        curBranch = "master";
-        master = initialCommitId;
-
-        //save the curBranch in a file in BRANCHES_DIR.
-        File curBranchFile = new File(BRANCHES_DIR, curBranch);
-        writeObject(curBranchFile, curBranch);
-
-        // save the head state in HEAD file.
-        head = initialCommitId;
-        writeObject(HEAD, initialCommitId);
-
-        // update the master to most recent commit.
-        writeObject(MASTER, initialCommitId);// save the initial commit (most recent commit) id in the master file
-
-        branches.put(curBranch, initialCommitId);// Add the current branch in the branches map.
-
-=======
-        BRANCHES_DIR.mkdirs();
-
-        mapInitializations();
-
-        // create initial commit has no parent and no files
-        Commit initialCommit = new Commit("initial commit", null);
-
-        // save the initialCommit object in the COMMITS_DIR and its name is its SHA1 id
         String initialCommitId = initialCommit.getId();
         File commitFile = new File(COMMITS_DIR, initialCommitId);
         writeObject(commitFile, initialCommit);
 
+        // Add the initial commit in the commits map with its id as a key.
         commits.put(initialCommitId, initialCommit);// add the initial commit in the commits map
+
+        // save the head state in HEAD file.
+        head = initialCommitId;
+        writeObject(HEAD, initialCommitId);
 
         // By default the current branch is the master.
         curBranch = "master";
         master = initialCommitId;
         writeContents(MASTER, master);// update the master file.
 
+        branches.put(curBranch, master);// Add the current branch in the branches map.
+
         //save the curBranch in a file in BRANCHES_DIR.
         File curBranchFile = new File(BRANCHES_DIR, curBranch);// access the branch file by the branch name.
         writeContents(curBranchFile, master);// the branch file content is the commit id which the branch references it.
         writeContents(CURRENT_BRANCH, "master");//save the current branch in the CURRENT_BRANCH file.
-
-        branches.put("master", initialCommitId);// Add the master branch in the branches map.
-
-        // save the head state in HEAD file.
-        head = initialCommitId;
-        writeContents(HEAD, head);
->>>>>>> master
     }
 
     public void add(String fileName) {
@@ -257,11 +215,8 @@ public class Repository {
 
         // find SHA1 id for the addedFile
         String fileId = Utils.sha1(fileContent);
-<<<<<<< HEAD
-        // check if the addedFile version/content is already existent in the last commit blobs
-=======
+
         // check if the addedFile version/content is already existent in the last commit blobs of the current branch(master)
->>>>>>> master
         boolean existsInLastCommit = commits.get(master).containsFile(fileName);
 
         // add the file if it is not existent in the last commit so it needs to be added.
@@ -286,13 +241,10 @@ public class Repository {
             // write the new staged files in index file
             stagingArea.save(index);
 
-<<<<<<< HEAD
         }
-=======
-        }// else => don`t add it again => do nothing
 
->>>>>>> master
-    }
+    }// else => don`t add it again => do nothing
+
 
     public void commit(String message) {
 
@@ -302,166 +254,76 @@ public class Repository {
             System.out.println("Please enter a commit message.");
             return;
         }
-<<<<<<< HEAD
-        if (stagingArea.getAddedFiles().isEmpty()) {
-=======
 
         if (stagingArea.getAddedFiles().isEmpty() && stagingArea.getRemovedFiles().isEmpty()) {
->>>>>>> master
             System.out.println("No changes added to the commit.");
             return;
         }
 
-<<<<<<< HEAD
-        // get the master SHA1 id
-        String parentId = Utils.sha1(master);
-
-        // access the master parent file by It's id and get the parent commit
+        // Get the parent commit (head of current branch)
+        String parentId = commits.get(head).getId();
         File parentFile = new File(COMMITS_DIR, parentId);
         Commit parent = readObject(parentFile, Commit.class);
 
-        // create the new commit with the given message and parent
-=======
-        // Read the parent commit from COMMITS_DIR
-        String parentId = commits.get(head).getId(); // the parent of the newCommit is the head commit.
-        File parentFile = new File(COMMITS_DIR, parentId);
-        Commit parent = readObject(parentFile, Commit.class);
-
-        // create the new commit with the given message and parent parentId
->>>>>>> master
+        // Create new commit with message and parent
         Commit newCommit = new Commit(message, parentId);
-
-        // clone the parent files into the new commit
         newCommit.setFiles(parent.getFiles());
 
-        // get the staged files from the staging area
+        // Apply added and removed files
         HashMap<String, String> addedFiles = stagingArea.getAddedFiles();
         HashMap<String, String> removedFiles = stagingArea.getRemovedFiles();
 
-<<<<<<< HEAD
-        //get the newCommit files
-        HashMap<String, String> newCommitFiles = newCommit.getFiles();
-
-        // add the staged files from the staging area to newCommit
-=======
-        // add the staged files for adding from the staging area to the newCommit
->>>>>>> master
         for (Map.Entry<String, String> entry : addedFiles.entrySet()) {
-            String fileName = entry.getKey();
-            String fileId = entry.getValue();
-
-            newCommit.addFile(fileName, fileId);
-<<<<<<< HEAD
+            newCommit.addFile(entry.getKey(), entry.getValue());
         }
-        // remove the files added for removal from the CWD.
+
         for (Map.Entry<String, String> entry : removedFiles.entrySet()) {
             newCommit.removeFile(entry.getKey());
-
-            // Remove the file from the CWD.
             File removedFile = new File(CWD, entry.getKey());
-            Utils.restrictedDelete(removedFile);
-=======
-
-        }
-        // remove the files added for removal from the CWD and from the new commit.
-        for (Map.Entry<String, String> entry : removedFiles.entrySet()) {
-
-                newCommit.removeFile(entry.getKey());
-
-                // Remove the file from the CWD.
-                File removedFile = new File(CWD, entry.getKey());
-                Utils.restrictedDelete(removedFile);
->>>>>>> master
-
-            /* TODO: what if it was not deleted ?! */
+            Utils.restrictedDelete(removedFile);// remove from the CWD
         }
 
-        String newCommitId = newCommit.getId(); // Find SHA1 hash(id) for the newCommit.
-        commits.put(newCommitId, newCommit);// add the new commit in the commits set.
-
-        // save the new commit in a new file in the COMMITS_DIR
+        // Save new commit
+        String newCommitId = newCommit.getId();
+        commits.put(newCommitId, newCommit);
         File newCommitFile = new File(COMMITS_DIR, newCommitId);
         writeObject(newCommitFile, newCommit);
 
-<<<<<<< HEAD
-        branches.put(curBranch , newCommitId); // update the curBranch id to the new commit id.
-        writeObject(CURRENT_BRANCH, curBranch); // Update/Overwrite the file saves the curBranch object.
-=======
-        branches.put(curBranch , newCommitId); // Update/Overwrite the curBranch id to the new commit id.
-        writeContents(CURRENT_BRANCH, curBranch); // Update/Overwrite the file saves the curBranch object.
->>>>>>> master
+        // Update branch pointer
+        branches.put(curBranch, newCommitId);
+        writeContents(CURRENT_BRANCH, curBranch);
 
-        stagingArea.clear();// Clear the staging area after commiting the changes.
+        // Clear and save staging area
+        stagingArea.clear();
+        stagingArea.save(index);
 
-        stagingArea.save(index);// save the staging area.
-<<<<<<< HEAD
-=======
-
-        // update the head pointer to reference to the new commit.
+        // Update HEAD
         head = newCommitId;
         writeContents(HEAD, head);
->>>>>>> master
     }
+
 
     public void rm(String fileMarkedForRemoval_Name) {
 
         validateInitialized();
 
         // Unstage the file if it is currently staged for addition.
-<<<<<<< HEAD
-        if (stagingArea.existentForEdition(fileMarkedForRemoval_Name)) {
+        if (stagingArea.existentForAddition(fileMarkedForRemoval_Name)) {
             stagingArea.unStage(fileMarkedForRemoval_Name);
+            return;
         }
 
         // If the file is tracked in the current commit => stage it for removal from the CWD.
-        else if (commits.get(head).containsFile(fileMarkedForRemoval_Name)) {
+        Commit headCommit = commits.get(head);
+        if (headCommit.containsFile(fileMarkedForRemoval_Name)) {
 
-            File fileMarkedForRemoval = new File(CWD, fileMarkedForRemoval_Name);
-
-            // find SHA1 id for the addedFile
-            String fileMarkedForRemoval_Content = Utils.readContentsAsString(fileMarkedForRemoval);
-            String fileMarkedForRemoval_Id = Utils.sha1(fileMarkedForRemoval_Content);
-
-            // check if there is already blob for the addedFile content
-            if (!blobs.containsKey(fileMarkedForRemoval_Id)) {
-
-                // create new blob for the addedFile
-                Blob fileMarkedForRemoval_Blob = new Blob(fileMarkedForRemoval, fileMarkedForRemoval_Name);
-
-                // save the new blob in a new file in BLOBS_DIR
-                File blobFile = new File(BLOBS_DIR, fileMarkedForRemoval_Blob.getId());
-                writeObject(blobFile, fileMarkedForRemoval_Blob);
-
-                // add the new blob in blobs set
-                blobs.put(fileMarkedForRemoval_Blob.getId(), fileMarkedForRemoval_Blob);
-            }
-
+            // mark the file for removal.
+            String fileMarkedForRemoval_Id = headCommit.getFileId(fileMarkedForRemoval_Name);
             stagingArea.markForRemoval(fileMarkedForRemoval_Name, fileMarkedForRemoval_Id);
             stagingArea.save(index);
-=======
-        if (stagingArea.existentForAddition(fileMarkedForRemoval_Name)) {
-            System.out.println("the file unStaged");
-            stagingArea.unStage(fileMarkedForRemoval_Name);
-        }
 
-        // If the file is tracked in the current commit => stage it for removal from the head commit and delete it from CWD.
-        else if (commits.get(head).containsFile(fileMarkedForRemoval_Name)) {
-
-            // remove the file from CWD if it exists.
-            File fileMarkedForRemoval = new File(CWD, fileMarkedForRemoval_Name);
-            Utils.restrictedDelete(fileMarkedForRemoval);
-
-            // Mark the file for removal from the current commit.
-            String fileForRemoval_Content = readContentsAsString(fileMarkedForRemoval);
-            String fileMarkedForRemoval_Id =Utils.sha1(fileForRemoval_Content);
-            stagingArea.markForRemoval(fileMarkedForRemoval_Name, fileMarkedForRemoval_Id);
-            System.out.println("marked for removal");
-            stagingArea.save(index);
-
->>>>>>> master
         } else
             System.out.println("No reason to remove the file.");
-
     }
 
     public void find(String message) {
@@ -663,7 +525,6 @@ public class Repository {
             return;
         }
 
-<<<<<<< HEAD
         Branch newBranch = new Branch(branchName, head); // Create the new branch at the current commit.
 
         // Save the new branch in a file on desk.
@@ -671,13 +532,6 @@ public class Repository {
         writeObject(newBranchFile, newBranch);
 
         branches.put(branchName, newBranch.getId()); // Track the new branch in the branch map.
-=======
-        // Save the new branch in a file on desk.
-        File newBranchFile = new File(BRANCHES_DIR, branchName);
-        writeContents(newBranchFile, head);
-
-        branches.put(branchName, head); // Track the new branch in the branch map.
->>>>>>> master
     }
 
     public void rm_branch(String branchName) {
@@ -700,21 +554,18 @@ public class Repository {
 
         // delete the file from branches map.
         branches.remove(branchName);
-<<<<<<< HEAD
 
-=======
->>>>>>> master
     }
 
-    public void status(){
+    public void status() {
         //............
     }
 
-    public void reset(){
+    public void reset() {
         //.....
     }
 
-    public void merge(){
+    public void merge() {
         //.....
     }
 }
