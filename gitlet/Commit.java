@@ -36,9 +36,6 @@ public class Commit implements Serializable {
     public HashMap<String, String> getFiles() {
         return new HashMap<String, String>(this.files); // Shallow copy
     }
-    public String getFile(String fileName) {
-        return files.get(fileName); // Shallow copy
-    }
 
     public void setFiles(HashMap<String, String> files) {
         this.files = new HashMap<String, String>(files);
@@ -49,8 +46,8 @@ public class Commit implements Serializable {
     }
 
     /** add reference to new/modified file added(staged)  */
-    public void addFile(String fileName ,  String content) {
-        files.put(fileName, content);
+    public void addFile(String fileName ,  String blobId) {
+        files.put(fileName, blobId);
     }
 
     public String getMessage() {
