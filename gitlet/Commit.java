@@ -1,5 +1,6 @@
 package gitlet;
 
+import java.io.File;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -46,15 +47,35 @@ public class Commit implements Serializable {
     }
 
     /** add reference to new/modified file added(staged)  */
-    public void addFile(String fileName ,  String blobId) {
-        files.put(fileName, blobId);
+    public void addFile(String fileName) {
+        File file  = new File(Repository.CWD,  fileName);
+        String fileId = Utils.sha1(Utils.readContentsAsString(file));
+        files.put(fileName, fileId);
+
+        // create a blob for the added file if there is no such a one.
+        if(Blob.getBlob(fileId) == null){
+            Blob newBlob = new Blob(file);
+            newBlob.save();
+        }
     }
 
     public String getMessage() {
         return message;
     }
 
+    public static Commit getCommit(String commitId){
 
+        File commitFile = new File(Repository.COMMITS_DIR, commitId);
+        if(!commitFile.exists()){
+            return null;
+        }
+        return Utils.readObject(commitFile, Commit.class);
+    }
+
+    public void save(){
+        File commitFile = new File(Repository.COMMITS_DIR, this.getId());
+        Utils.writeObject(commitFile, this);
+    }
 
     public String getId() {
         return Utils.sha1(
