@@ -57,15 +57,11 @@ public class Repository implements Serializable {
      * Represents the current branch.
      */
     String curBranch;
-    /**
-     * Tracks whether the Gitlet repository has been initialized.
-     */
-
+    
     public boolean backupPerformed = false; // to backup GITLET_DIR state each time when the program terminates
 
     public void mapInitializations() {
         stagingArea = new StagingArea();
-        //blobs = new HashMap<String, Blob>();
     }
 
     public void validateInitialized() {
