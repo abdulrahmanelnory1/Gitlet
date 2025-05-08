@@ -40,11 +40,6 @@ public class Repository implements Serializable {
      * The index file saves the staged files.
      */
     public static final File index = join(GITLET_DIR, "index");
-
-    /**
-     * The index file saves the staged files.
-     */
-    public static final File REPOSITORY = join(GITLET_DIR, "repo");
     /**
      * points to the current commit.
      */
