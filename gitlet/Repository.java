@@ -109,7 +109,7 @@ public class Repository implements Serializable {
         File masterBranchFile = new File(BRANCHES_DIR, "master");
         writeContents(masterBranchFile, initialCommitId); // master file content is the most recent commit in the master branch which is the initial commit id
 
-        // by default the first branch and is current branch is the master branch.
+        // by default the first branch is the current branch is the master branch.
         curBranch = "master";
         writeContents(CURRENT_BRANCH ,  curBranch);// Save the current branch which is master in the CURRENT_BRANCH file.
     }
