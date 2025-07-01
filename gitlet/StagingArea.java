@@ -9,7 +9,7 @@ import static gitlet.Utils.writeObject;
 
 public class StagingArea implements Serializable {
 
-    /** map represents the added/removed file with file name as a key and the file id as a value*/
+    /** map represents the added/removed file with file name as a key and the file id/blob as a value*/
     private HashMap<String, String> addedFiles;
     private HashMap<String, String> removedFiles;
 
@@ -23,7 +23,7 @@ public class StagingArea implements Serializable {
     }
 
     public boolean containsAddedFile(String fileId) {
-        return addedFiles.containsKey(fileId);
+        return addedFiles.containsKey(fileId) ||  removedFiles.containsKey(fileId);
     }
 
     public HashMap<String, String> getRemovedFiles() {
@@ -33,6 +33,7 @@ public class StagingArea implements Serializable {
     public void addForAddition(String fileName) {
         File file = new File (Repository.CWD, fileName);
         String fileId = Utils.sha1(Utils.readContentsAsString(file));
+        // Even if the file exists, it overwrites on it so it keeps the most recent version of the file.
         addedFiles.put(fileName, fileId);
     }
 
@@ -46,8 +47,13 @@ public class StagingArea implements Serializable {
         return addedFiles.containsKey(fileName);
     }
 
+    public boolean existentForRemoval(String fileName) {
+        return removedFiles.containsKey(fileName);
+    }
+
     public void clear() {
         addedFiles.clear();
+        removedFiles.clear();
     }
 
     public void unStage(String fileName) {
