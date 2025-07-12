@@ -2,9 +2,7 @@ package gitlet;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static gitlet.Utils.*;
 
@@ -31,7 +29,7 @@ public class Repository implements Serializable {
 
     public static final File BRANCHES_DIR = join(GITLET_DIR, "Branches");
 
-    public static final File CURRENT_BRANCH = join(GITLET_DIR, "current createBranch");
+    public static final File CURRENT_BRANCH = join(GITLET_DIR, "current branch");
     /**
      * The head file represents the current commit.
      */
@@ -44,15 +42,11 @@ public class Repository implements Serializable {
      * represents the added files in staging area before they are commited.
      */
     StagingArea stagingArea;
-    /**
-     * Represents the current createBranch.
-     */
-    String curBranch;
+
     /**
      * Tracks whether the Gitlet repository has been initialized.
      */
-
-    public boolean backupPerformed = false; // to backup GITLET_DIR state each time when the program terminates
+    public boolean backupPerformed = false;
 
     public void mapInitializations() {
         stagingArea = new StagingArea();
@@ -74,11 +68,13 @@ public class Repository implements Serializable {
 
         mapInitializations();
 
-        curBranch = readContentsAsString(CURRENT_BRANCH);
         if (index.exists())// ensure that index file exists cuz it can not be existent if there aren`t files staged before.
             stagingArea = readObject(index, StagingArea.class);
     }
 
+    /**
+     * Creates a new Gitlet version-control system in the current directory.
+     */
     public void init() {
 
         if (GITLET_DIR.exists()) {
@@ -94,7 +90,7 @@ public class Repository implements Serializable {
         mapInitializations();
 
         // create initial commit has no parent and no files
-        Commit initialCommit = new Commit("initial commit", null);
+        Commit initialCommit = new Commit("initial commit", null, null);
         // save the initialCommit object in the file named by its SHA1 id
         String initialCommitId = initialCommit.getId();
         File commitFile = new File(COMMITS_DIR, initialCommitId);
@@ -108,10 +104,13 @@ public class Repository implements Serializable {
         writeContents(masterBranchFile, initialCommitId); // master file content is the most recent commit in the master createBranch which is the initial commit id
 
         // by default the first createBranch is the current createBranch is the master createBranch.
-        curBranch = "master";
-        writeContents(CURRENT_BRANCH, curBranch);// Save the current createBranch which is master in the CURRENT_BRANCH file.
+        writeContents(CURRENT_BRANCH, "master");// Save the current createBranch which is master in the CURRENT_BRANCH file.
     }
 
+    /**
+     * Adds a copy of the file as it currently exists to the staging area
+     * java git-let.Main add [file name].
+     */
     public void add(String fileName) {
 
         validateInitialized();
@@ -124,21 +123,34 @@ public class Repository implements Serializable {
             return;
         }
 
-        stagingArea.addForAddition(fileName);
-        // write the new staged files in index file
+        String head = readContentsAsString(HEAD);
+
+        // If the current working version of the file is identical to the version in the current commit, do not stage it to be added, and remove it from the staging area if it is already there.
+        String fileContentInCWD = readContentsAsString(addedFileForAddition);
+
+        if (fileContentInCWD.equals(Commit.getCommit(head).getFileId(fileName))) {
+
+            // Remove from staging area
+            stagingArea.unStage(fileName);
+
+            // Unstage it for removal.
+
+            return;
+        }
+
+        stagingArea.stageForAddition(fileName);
         stagingArea.save();
     }
 
+    /**
+     * Saves a snapshot of tracked files in the current commit and staging area
+     * so that they can be restored at a later time.
+     */
     public void commit(String message) {
 
         validateInitialized();
 
-        if (message == null) {
-            System.out.println("Please enter a commit message.");
-            return;
-        }
-
-        if (stagingArea.getAddedFiles().isEmpty() && stagingArea.getRemovedFiles().isEmpty()) {
+        if (stagingArea.getStagedForAddition().isEmpty() && stagingArea.getRemovedFiles().isEmpty()) {
             System.out.println("No changes added to the commit.");
             return;
         }
@@ -146,21 +158,22 @@ public class Repository implements Serializable {
         // Get the parent commit (the current commit)
         String headCommitId = readContentsAsString(HEAD);
         Commit parent = Commit.getCommit(headCommitId);
-        String parentId = parent.getId();
 
-        // Create new commit with message as its message and a parentId as its parent.
-        Commit newCommit = new Commit(message, parentId);
+        // Create new commit with message, and parentId as its parent1 and null for parent2.
+        Commit newCommit = new Commit(message, parent.getId(), null);
         newCommit.setFiles(parent.getFiles());
 
         // Apply added and removed files
-        HashMap<String, String> addedFiles = stagingArea.getAddedFiles();
+        HashMap<String, String> addedFiles = stagingArea.getStagedForAddition();
         HashMap<String, String> removedFiles = stagingArea.getRemovedFiles();
 
         for (Map.Entry<String, String> entry : addedFiles.entrySet()) {
-            newCommit.addFile(entry.getKey());
+            // File name as a key and file id as a value.
+            newCommit.addFile(entry.getKey(), entry.getKey());
         }
 
         for (Map.Entry<String, String> entry : removedFiles.entrySet()) {
+            // File name as a key.
             newCommit.removeFile(entry.getKey());
         }
 
@@ -173,11 +186,10 @@ public class Repository implements Serializable {
         // public static final File CURRENT_BRANCH = join(GITLET_DIR, "current createBranch");
 
         // set the new commit as the most recent commit in the current createBranch.
-        File curBranchFile = new File(BRANCHES_DIR, curBranch);
-        writeContents(curBranchFile, newCommitId);
+        writeContents(CURRENT_BRANCH, newCommitId);
 
         // Update HEAD
-        writeContents(HEAD, headCommitId);
+        writeContents(HEAD, newCommitId);
 
         // Clear and save the staging area
         stagingArea.clear();
@@ -190,36 +202,20 @@ public class Repository implements Serializable {
      * and if the file is tracked in the current commit, stage it for removal
      * and remove the file from the working directory if the user has not already done so.
      */
-    public void removeFile(String fileMarkedForRemoval_Name) {
+    public void removeFile(String fileName) {
 
         Commit headCommit = Commit.getCommit(readContentsAsString(HEAD));
 
         validateInitialized();
-        boolean isTracked = headCommit.containsFile(fileMarkedForRemoval_Name);
-        //boolean stagedForRemoval = stagingArea.existentForRemoval(fileMarkedForRemoval_Name);
-        boolean stagedForAddition = stagingArea.existentForAddition(fileMarkedForRemoval_Name);
+        boolean isTracked = headCommit.containsFile(fileName);
+        boolean stagedForAddition = stagingArea.existentForAddition(fileName);
 
-
-        if (!stagedForAddition && !isTracked) {
+        if ((!stagedForAddition && !isTracked)) {
             System.out.println("No reason to remove the file.");
             return;
         }
 
-        // Unstage the file if it is currently staged for addition.
-        if (stagedForAddition) {
-            stagingArea.unStage(fileMarkedForRemoval_Name);
-            stagingArea.save();
-        }
-        // If the file is tracked in the current commit => stage it for removal and delete it from the CWD.
-        if (isTracked) {
-
-            // mark the file for removal.
-            stagingArea.markForRemoval(fileMarkedForRemoval_Name);
-            stagingArea.save();
-
-            // Delete the file from CWD.
-            Utils.restrictedDelete(fileMarkedForRemoval_Name);
-        }
+        stagingArea.markForRemoval(fileName);
     }
 
     /**
@@ -249,28 +245,45 @@ public class Repository implements Serializable {
             System.out.println("Found no commit with that message.");
     }
 
+    /**
+     * Prints out the commit log staring at the current head commit. java gitlet.Main log.
+     */
     public void log() {
 
         validateInitialized();
 
-        Commit current = Commit.getCommit(readContentsAsString(HEAD));// start iterate from the most recent commit.
+        Stack<String> s = new Stack<String>();
 
-        while (current != null) {
+        String head = readContentsAsString(HEAD);
 
-            System.out.println(current);
-            Commit parent = Commit.getCommit(current.getParent()); // git the parent by its id from the commits map.
-            current = parent;
+        s.add(head);
+        Set<String> visited = new HashSet<String>();
+
+        while (!s.isEmpty()) {
+
+            String curId = s.pop();
+
+            if (!visited.contains(curId)) {
+                Commit curCommit = Commit.getCommit(curId);
+                System.out.println(curCommit);
+
+                // push the id of the first parent.
+                s.add(curCommit.getParent1());
+
+                String secParent = curCommit.getParent2();
+
+                // push the id of the second parent if it exists.
+                if (secParent != null)
+                    s.add(secParent);
+
+                visited.add(curId);
+            }
         }
-
-        /*
-        if( commit is merged ){
-
-        .....
-
-        }
-        */
     }
 
+    /**
+     * displays information about all commits ever made.
+     */
     public void global_log() {
 
         validateInitialized();
@@ -284,53 +297,26 @@ public class Repository implements Serializable {
             Commit commit = Commit.getCommit(commitId);
             System.out.println(commit);
         }
-        /*
-        if( commit is merged ){
-
-        .....
-
-        }
-        */
     }
 
+    /**
+     * Takes the version of the file as it exists in the head commit
+     * and puts it in the working directory, overwriting the version of the file
+     * that’s already there if there is one. The new version of the file is not staged.
+     */
     public void checkoutFile(String fileName) {
 
         validateInitialized();
 
         Commit curCommit = Commit.getCommit(readContentsAsString(HEAD)); // Retrieve the current commit (head commit).
 
-        // Restore the file from the curCommit if it contains it.
-        if (curCommit.containsFile(fileName)) {
-
-            // get the file from the curCommit.
-            String fileId = curCommit.getFileId(fileName);
-
-            String fileContent = Blob.getBlob(fileId).getContent();// get the file content from it's blob.
-
-            // Add the file in CWD if the file doesn't exist or overwrite the file if it exists.
-            File fileInCWD = new File(CWD, fileName);
-            writeContents(fileInCWD, fileContent);
-        } else
-            System.out.println("File does not exist in that commit.");
-    }
-
-    public void checkoutFile(String commitId, String fileName) {
-
-        validateInitialized();
-
-        Commit commit = Commit.getCommit(commitId); // retrieve the commit by its Id.
-
-        if (commit == null) {
-            System.out.println("No commit with that id exists.");
-            return;
-        }
-
-        if (!commit.containsFile(fileName)) {
+        if (!curCommit.containsFile(fileName)) {
             System.out.println("File does not exist in that commit.");
             return;
         }
 
-        String fileId = commit.getFileId(fileName); // get the file from the curCommit.
+        // get the file from the curCommit.
+        String fileId = curCommit.getFileId(fileName);
 
         String fileContent = Blob.getBlob(fileId).getContent();// get the file content from it's blob.
 
@@ -340,14 +326,95 @@ public class Repository implements Serializable {
     }
 
     /**
-     * Checks out all files from the given createBranch into the working directory (CWD).
-     * Behavior:-
-     * 1. Validates the target createBranch exists and is not the current createBranch.
-     * 2. Aborts if untracked files in CWD would be overwritten.
-     * 3. For each file in the target createBranch:
-     *    - Overwrites existing CWD version (if present)
-     *    - Creates new files (if not present)
-     * 4. Deletes files tracked in current createBranch but absent in target createBranch.
+     * Takes the version of the file as it exists in the commit with the given id,
+     * and puts it in the working directory, overwriting the version of the file
+     * that’s already there if there is one. The new version of the file is not staged.
+     */
+    public void checkoutFile(String commitID, String fileName) {
+
+        validateInitialized();
+
+        Commit commit = Commit.getCommit(commitID); // retrieve the commit by its Id.
+
+        if (!Utils.plainFilenamesIn(COMMITS_DIR).contains(commitID)) {
+            System.out.println("No commit with that id exists.");
+            return;
+        }
+
+        if (!commit.containsFile(fileName)) {
+            System.out.println("File does not exist in that commit.");
+            return;
+        }
+
+        String fileContent = commit.getFileContent(fileName);
+
+        // Add the file in CWD if the file doesn't exist or overwrite it if it exists.
+        File fileInCWD = new File(CWD, fileName);
+        writeContents(fileInCWD, fileContent);
+    }
+
+    /**
+     * Checks out all the files tracked by the given commit.
+     * Removes tracked files that are not present in that commit.
+     * Also moves the current branch’s head to that commit node.
+     * The [commit id] may be abbreviated as for checkout.
+     * The staging area is cleared.
+     * The command is essentially checkout of an arbitrary commit
+     * that also changes the current branch head.
+     */
+    public void reset(String commitID) {
+
+        // 1. Check if commit exists
+        if (!Utils.plainFilenamesIn(COMMITS_DIR).contains(commitID)) {
+            System.out.println("No commit with that id exists.");
+            System.exit(0);
+        }
+
+        Commit currentCommit = Commit.getCommit(readContentsAsString(HEAD));
+
+        Commit givenCommit = Commit.getCommit(commitID);
+        HashMap<String, String> givenCommitFiles = givenCommit.getFiles();
+
+        List<String> CWDFiles = Utils.plainFilenamesIn(CWD); // get all the commit file names from the COMMITS_DIR
+
+        for (String fileName : CWDFiles) {
+            if (givenCommit.containsFile(fileName)
+                    && !currentCommit.containsFile(fileName)) {
+                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                System.exit(0);
+            }
+        }
+
+        // Checks out all the files tracked by the given commit.
+        for (String fileNameInCommitToReset : givenCommitFiles.keySet()) {
+            checkoutFile(commitID, fileNameInCommitToReset);
+        }
+
+        // Removes tracked files that are not present in that commit.
+        for (String fileName : CWDFiles) {
+            if (currentCommit.containsFile(fileName) && !givenCommit.containsFile(fileName)) {
+                Utils.restrictedDelete(fileName);
+            }
+        }
+
+        String givenCommitID = givenCommit.getId();
+
+        writeContents(HEAD, givenCommitID);
+        writeContents(CURRENT_BRANCH, givenCommitID);
+
+        stagingArea.clear();
+        stagingArea.save();
+
+    }
+
+    /**
+     * Takes all files in the commit at the head of the given branch,
+     * and puts them in the working directory, overwriting the versions of the files
+     * that are already there if they exist. Also, at the end of this command,
+     * the given branch will now be considered the current branch (HEAD).
+     * Any files that are tracked in the current branch but are not present
+     * in the checked-out branch are deleted. The staging area is cleared,
+     * unless the checked-out branch is the current branch.
      */
     public void checkoutBranch(String branchName) {
 
@@ -394,21 +461,21 @@ public class Repository implements Serializable {
         // Delete any files tracked in the current commit but not in the checked out createBranch.
         for (String fileName : Commit.getCommit(headCommitID).getFiles().keySet()) {
 
-            if(!branchHeadCommit.containsFile(fileName))
+            if (!branchHeadCommit.containsFile(fileName))
                 restrictedDelete(fileName);
 
         }
 
-        // Update the current createBranch to the checked out createBranch.
-        curBranch = branchName;
-        writeObject(CURRENT_BRANCH, curBranch);
+        // Update the current branch file to the checked out branch.
+        writeObject(CURRENT_BRANCH, branchName);
 
         // Clear the staging area.
         stagingArea.clear();
     }
 
     /**
-     * Create new branch with the given name and points it as the current head commit.
+     * Creates a new branch with the given name, and points it at the current head commit.
+     * Like real Git, This command does NOT immediately switch to the newly created branch.
      */
     public void createBranch(String branchName) {
 
@@ -426,9 +493,9 @@ public class Repository implements Serializable {
     }
 
     /**
-     *  Delete Branch with the given name.
-     *  The deleted createBranch can not be the curren branch.
-     *  Be sure that The deleted createBranch exists before deletion.
+     * Delete Branch with the given name.
+     * The deleted createBranch can not be the curren branch.
+     * Be sure that The deleted createBranch exists before deletion.
      */
     public void removeBranch(String branchName) {
 
@@ -455,11 +522,236 @@ public class Repository implements Serializable {
         //............
     }
 
-    public void reset() {
-        //.....
+    public void merge(String branchName) {
+
+        validateInitialized();
+
+        String curBranchId = readContentsAsString(HEAD); // current branch (head commit of the current branch)
+        Commit curBranchHeadCommit = Commit.getCommit(curBranchId);
+        File otherBranchFile = new File(BRANCHES_DIR, branchName);
+        String otherBranchID = readContentsAsString(otherBranchFile);
+        Commit otherBranchHeadCommit = Commit.getCommit(otherBranchID);
+        String splitPoint = findSplitPoint(curBranchId, otherBranchID);
+        Commit splitPointCommit = Commit.getCommit(splitPoint);
+
+        /* Failure  cases :- */
+
+        // Failure case 1- The given branch does ont exist
+        if (!otherBranchFile.exists()) {
+            System.out.println("A branch with that name does not exist.");
+            return;
+        }
+
+        // Failure case 2- The given branch is the current branch.
+        String curBranchName = readContentsAsString(CURRENT_BRANCH);
+        if (branchName.equals(curBranchName)) {
+            System.out.println("Cannot merge a branch with itself.");
+            return;
+        }
+
+        // Failure case 3- the split point is the head commit of the current branch
+        if (splitPoint.equals(curBranchId)) {
+            System.out.println("Current branch fast-forwarded.");
+        }
+
+        // Failure case 4- The split point is the given branch head.
+        if (splitPoint.equals(otherBranchID)) {
+            System.out.println("Given branch is an ancestor of the current branch.");
+        }
+
+        if (!stagingArea.getRemovedFiles().isEmpty() || !stagingArea.getStagedForAddition().isEmpty()) {
+            System.out.println("You have uncommitted changes.");
+            System.exit(0);
+        }
+
+        boolean conflicted = false;
+
+        Set<String> allFiles = new HashSet<String>();
+
+        allFiles.addAll(curBranchHeadCommit.getFiles().keySet());
+        allFiles.addAll(otherBranchHeadCommit.getFiles().keySet());
+        allFiles.addAll(splitPointCommit.getFiles().keySet());
+
+
+        for (String fileName : allFiles) {
+
+            String fileContentInCurBranch = curBranchHeadCommit.getFileContent(fileName);
+            String fileContentInOtherBranch = otherBranchHeadCommit.getFileContent(fileName);
+            String fileContentInSplitPoint = splitPointCommit.getFileContent(fileName);
+
+            boolean fileExistsInCurBranch = curBranchHeadCommit.containsFile(fileName);
+            boolean fileExistsInOtherBranch = otherBranchHeadCommit.containsFile(fileName);
+            boolean fileExistsInSplitPoint = splitPointCommit.containsFile(fileName);
+
+            /* Case 1- Any files that have been modified in the given branch since the split point, but not modified in the current branch since the split point should be changed to their versions in the given branch. */
+            if (fileExistsInSplitPoint && fileExistsInOtherBranch && fileExistsInCurBranch) {
+
+                boolean fileModifiedInOtherBranch = !fileContentInOtherBranch.equals(fileContentInSplitPoint);
+                boolean fileModifiedInCurBranch = !fileContentInCurBranch.equals(fileContentInSplitPoint);
+
+                if (fileModifiedInOtherBranch && !fileModifiedInCurBranch) {
+
+                    File fileInCWD = new File(CWD, fileName);
+                    writeContents(fileInCWD, fileContentInOtherBranch);
+
+                    stagingArea.stageForAddition(fileName);
+                    stagingArea.save();
+                }
+
+                /* Case 2- Any files that have been modified in the current branch but not in the given branch since the split point should stay as they are. */
+                if (!fileModifiedInOtherBranch && fileModifiedInCurBranch) {
+
+                    // Do nothing.
+                }
+            }
+            /* Case 3- Any files that have been modified in both the current and given branch in the same way (both files now have the same content or were both removed) are left unchanged by the merge.*/
+
+            // Both files were removed.
+            if (fileExistsInSplitPoint && !fileExistsInCurBranch && !fileExistsInOtherBranch)
+                // Ensure the file is unstaged.
+                stagingArea.unStage(fileName);
+
+            // Both files are not removed, but changed and have the same content.
+            if (fileExistsInSplitPoint && fileExistsInCurBranch && fileExistsInOtherBranch) {
+
+                boolean fileModifiedInOtherBranch = !fileContentInOtherBranch.equals(fileContentInSplitPoint);
+                boolean fileModifiedInCurBranch = !fileContentInCurBranch.equals(fileContentInSplitPoint);
+
+                if (fileModifiedInOtherBranch && fileModifiedInCurBranch)
+                    // Ensure the file is unstaged.
+                    stagingArea.unStage(fileName);
+            }
+
+            /* case 4- Any files that were not present at the split point and are present only in the current branch should remain as they are. */
+            // Do nothing , file remains as they are.
+
+            /* Case 5- Any files that were not present at the split point and are present only in the given branch should be checked out and staged. */
+            if (!fileExistsInSplitPoint && !fileExistsInCurBranch && fileExistsInOtherBranch) {
+
+                // Add the file if it does not exist in CWD, Overwrite the file in CWD if it exists.
+                File fileInCWD = new File(CWD, fileName);
+                writeContents(fileInCWD, fileContentInOtherBranch);
+
+                // Stage changes.
+                stagingArea.stageForAddition(fileName);
+                stagingArea.save();
+            }
+
+            /* Case 6- Any files present at the split point, unmodified in the current branch, and absent in the given branch should be removed (and untracked).*/
+
+            if (fileExistsInSplitPoint && !fileExistsInOtherBranch && fileExistsInCurBranch) {
+
+                if (!fileContentInCurBranch.equals(fileContentInSplitPoint)) {
+
+                    // stage it for removal
+                    stagingArea.markForRemoval(fileName);
+                    stagingArea.save();
+                }
+            }
+
+            /* Case 7- Any files present at the split point, unmodified in the given branch, and absent in the current branch should remain absent.*/
+            // Do nothing.
+
+            /* Case 8- Any files modified in different ways in the current and given branches are in conflict. the contents of both are changed and different from other, or the contents of one are changed and the other file is deleted, or the file was absent at the split point and has different contents in the given and current branches. In this case, replace the contents of the conflicted file with */
+
+            boolean fileHasDifferentContents = !fileContentInCurBranch.equals(fileContentInOtherBranch);
+            if ((!fileExistsInSplitPoint &&
+                    fileExistsInOtherBranch && fileExistsInCurBranch && fileHasDifferentContents) ||
+                    (fileExistsInSplitPoint &&
+                            (fileExistsInOtherBranch && !fileExistsInCurBranch) ||
+                            (!fileExistsInOtherBranch && fileExistsInCurBranch) ||
+                            (fileExistsInOtherBranch && fileExistsInCurBranch && !fileHasDifferentContents))) {
+
+                if (!fileContentInCurBranch.endsWith("\n"))
+                    fileContentInCurBranch = fileContentInCurBranch + "\n";
+                if (!fileContentInOtherBranch.endsWith("\n"))
+                    fileContentInOtherBranch = fileContentInOtherBranch + "\n";
+
+                String mergedFileContent = "<<<<<<< HEAD\n" + fileContentInCurBranch + "=======" + fileContentInOtherBranch + ">>>>>>>";
+
+                File fileInCWD = new File(CWD, fileName);
+                writeContents(fileInCWD, mergedFileContent);
+
+                stagingArea.stageForAddition(fileName);
+                stagingArea.save();
+
+                conflicted = true;
+            }
+        }
+
+        commitWithMerge(otherBranchID);
+        if (conflicted)
+            System.out.println("Encountered a merge conflict.");
     }
 
-    public void merge() {
-        //.....
+    /**
+     * just like commit, but it is for commits with two parents.
+     */
+    private void commitWithMerge(String otherParentId) {
+
+        if (stagingArea.getStagedForAddition().isEmpty() && stagingArea.getRemovedFiles().isEmpty()) {
+            System.out.println("No changes added to the commit.");
+            return;
+        }
+
+        String head = readContentsAsString(HEAD);
+
+        Commit mergeCommit = new Commit("Merged " + otherParentId + " into " + head + ".", head, otherParentId);
+
+        mergeCommit.setFiles(Commit.getCommit(head).getFiles());
+
+        // Apply added and removed files
+        HashMap<String, String> addedFiles = stagingArea.getStagedForAddition();
+        HashMap<String, String> removedFiles = stagingArea.getRemovedFiles();
+
+        for (Map.Entry<String, String> entry : addedFiles.entrySet()) {
+            // File name as a key and file id as a value.
+            mergeCommit.addFile(entry.getKey(), entry.getKey());
+        }
+
+        for (Map.Entry<String, String> entry : removedFiles.entrySet()) {
+            // File name as a key.
+            mergeCommit.removeFile(entry.getKey());
+        }
+
+        // Save the commit
+        mergeCommit.save();
+
+        // update the head of the current branch to the merge commit.
+        writeContents(CURRENT_BRANCH, mergeCommit.getId());
+
+        // Update HEAD
+        writeContents(HEAD, mergeCommit.getId());
+
+        // Clear and save the staging area
+        stagingArea.clear();
+        stagingArea.save();
+    }
+
+    private String findSplitPoint(String branch1HeadID, String branch2HeadID) {
+
+        Queue<String> IDs = new LinkedList<String>();
+
+        HashMap<String, Integer> visited = new HashMap<String, Integer>();
+        IDs.add(branch1HeadID);
+        IDs.add(branch2HeadID);
+
+        while (!IDs.isEmpty()) {
+
+            String commitID = IDs.poll();
+            String parentId = Commit.getCommit(commitID).getParent1();
+
+            if (visited.containsKey(commitID))
+                return commitID;
+
+            // the split point is the first commit is going to be added twice because it is common between the two branches.
+            visited.put(commitID, 1); // Marked as visited
+
+            if (parentId != null)
+                IDs.add(parentId);
+        }
+
+        // Should never happen.
+        return null;
     }
 }
